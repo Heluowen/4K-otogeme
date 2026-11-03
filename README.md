@@ -25,10 +25,30 @@ npm run dev
 | 命令 | 作用 |
 |---|---|
 | `npm run dev` | 开发服务器（HMR） |
-| `npm run build` | 类型检查 + 生产构建 |
+| `npm run build` | 类型检查 + 生产构建（多文件，适合部署到静态服务器） |
+| `npm run build:portable` | 同上，再把产物内联成**单文件 HTML**（双击即可游玩） |
 | `npm run typecheck` | 只做类型检查 |
 | `npm test` | 冒烟测试（解析 / 判定 / 缓存 / 倒计时 / 庆祝动画 / 下落样式，共 208 项断言） |
 | `pwsh tools/make-fixture.ps1` | 可选：用 PowerShell 生成一份真实 zip 作为交叉验证素材 |
+
+### 两种构建产物，用哪个？
+
+| 产物 | 怎么用 | 限制 |
+|---|---|---|
+| `dist/`（`npm run build`） | 用静态服务器指过去 | 必须走 HTTP |
+| `dist-portable/index.html`（`npm run build:portable`） | **双击就能玩** | 保存谱面到磁盘这功能会降级 |
+
+**为什么默认构建不能双击打开**：Vite 产出的是 `<script type="module" src="...">`，
+而浏览器**禁止从 `file://` 加载 ES 模块**（模块一律走 CORS 检查），双击会白屏。
+`build:portable` 把 JS/CSS 直接内联进 HTML、并且用**经典脚本**（不是 module）内联，
+绕开了整个模块解析流程。
+
+`tools/inline-dist.mjs` 会自检：产物里不能残留任何外部引用、不能残留 `type="module"`、
+核心 DOM 必须齐全 —— 不满足就直接报错，而不是产出一个"能生成但跑不起来"的文件。
+
+> 单文件版在 `file://` 下音画同步、判定、倾斜、按键音这些核心玩法完全正常，
+> 但**保存谱面到磁盘会用不了**（File System Access API 在 `file://` 下不可用），
+> 会自动降级到浏览器存储。
 
 ---
 

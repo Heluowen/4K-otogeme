@@ -1,0 +1,19 @@
+{
+  "name": "rhythm-4k",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "浏览器端 4K 下落式音游原型 —— 读取 osu!mania 谱面(.osz/.zip)并跟随音乐播放",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "node tools/smoke-test.mjs"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "^6.2.5",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.0"
+  }
+}

@@ -1,0 +1,448 @@
+/*
+ * 全局样式。刻意保持简单：这是一个原型，重点在引擎而不是 UI。
+ * 只有播放画面(Canvas)需要认真对待，其余控件够用即可。
+ */
+
+:root {
+  --bg: #0b0b10;
+  --panel: #14141c;
+  --panel-2: #1b1b26;
+  --border: #2a2a38;
+  --text: #e8e8f0;
+  --muted: #8a8aa0;
+  --accent: #4da3ff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/*
+ * hidden 属性的兜底。
+ *
+ * HTML 的 hidden 属性是靠浏览器默认样式表里的 `[hidden] { display: none }` 实现的。
+ * 而**作者样式表的优先级永远高于默认样式表** —— 只要在别处写了
+ * `.overlay { display: flex }` 这种规则，hidden 就彻底失效了，
+ * 元素会一直显示出来，而且完全不报错，非常难查。
+ *
+ * 界面切换（导入 / 选难度 / 播放 / 设置 / 结算）全部依赖 hidden，
+ * 所以这里加一条 !important 兜底，从根上杜绝这一类问题。
+ */
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.6 system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+}
+
+.app {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+}
+
+/*
+ * 游玩时把容器放宽。
+ *
+ * 导入 / 选难度那两个页面用 900px 就够了（内容是一列列表，太宽反而难读），
+ * 但游玩区越宽、轨道就能铺得越大。所以只在播放面板显示时放宽。
+ *
+ * 类挂在 body 上，由 ui/app.ts 的 showPanel() 切换。
+ */
+body.is-playing .app {
+  max-width: 1240px;
+}
+
+/*
+ * 信息栏显示时再放宽一截。
+ *
+ * 信息栏本身占 240px + 16px 间距，如果容器不跟着加宽，它会直接吃掉轨道的宽度、
+ * 把游玩区挤小 —— 那就和"把游玩区做大"的初衷反过来了。
+ */
+body.is-playing.has-info-panel .app {
+  max-width: 1520px;
+}
+
+/* 游玩时标题的副标题就没用了，收起来给游玩区让出垂直空间 */
+body.is-playing .subtitle {
+  display: none;
+}
+
+/* ---------- 顶部标题 ---------- */
+
+.topbar h1 {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: 0.08em;
+}
+
+.subtitle {
+  margin: 4px 0 24px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* ---------- 导入区 ---------- */
+
+.dropzone {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  padding: 48px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.dropzone:hover,
+.dropzone:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+/* 拖拽悬停时的高亮：由 JS 在 dragenter/dragleave 时切换 */
+.dropzone.is-over {
+  border-color: var(--accent);
+  background: #17202e;
+}
+
+.dz-title {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+
+.dz-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+code {
+  background: var(--panel-2);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 12px;
+}
+
+.status {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  min-height: 20px;
+  white-space: pre-wrap;
+}
+
+.status.is-error {
+  color: #ff7a7a;
+}
+
+/* ---------- 难度列表 ---------- */
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.panel-head h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.panel-head h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+/* 面板标题右边的按钮组 */
+.panel-actions {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
+
+.diff-list {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.diff-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.diff-item:hover {
+  border-color: var(--accent);
+  background: var(--panel-2);
+}
+
+.diff-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 键数徽标：4K 正常显示，其它键数标红提醒（引擎本身支持任意键数） */
+.diff-keys {
+  flex: none;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  border-radius: 999px;
+  padding: 2px 9px;
+  background: var(--panel-2);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.diff-keys.is-other {
+  color: #ffc46b;
+  border-color: #5a4520;
+}
+
+.diff-meta {
+  flex: none;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 播放区 ---------- */
+
+/*
+ * 游玩区 + 信息栏并排。
+ *
+ * 信息栏放在 DOM 里 stage 的后面；要放左边时只是把 flex 方向反过来，
+ * 不需要在 JS 里挪 DOM —— 挪节点会重建 canvas 所在的子树，
+ * 白白赔上一次引擎重算布局。
+ */
+.play-layout {
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+}
+
+.play-layout[data-side='left'] {
+  flex-direction: row-reverse;
+}
+
+.stage {
+  position: relative;
+  flex: 1 1 auto;
+  /* flex 子项默认 min-width: auto，会被内容撑住而无法收缩；置 0 才真正可缩 */
+  min-width: 0;
+  /*
+   * 游玩区高度。用 clamp 而不是单纯 vh，是为了两头都有保障：
+   *   - 下限 420px：小窗口下也不至于缩成一条缝
+   *   - 上限 820px：大屏幕上不至于占满整屏、把下面的控件挤到看不见
+   * 中间的 78vh 让它跟着窗口自适应。
+   */
+  height: clamp(420px, 78vh, 820px);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/*
+ * Canvas 的 CSS 尺寸交给父容器决定，像素尺寸(width/height 属性)由 JS 按
+ * devicePixelRatio 设置，这样在高分屏上线条才是锐利的。
+ */
+#stage-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------- 信息栏 ---------- */
+
+.info-panel {
+  flex: none;
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  /* 内容（长标题、长曲师名）可能超出高度，允许滚动而不是撑破布局 */
+  overflow-y: auto;
+}
+
+.info-cover {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel-2);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.info-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* 曲绘比例五花八门，统一裁切填满，不要变形 */
+  object-fit: cover;
+}
+
+.info-empty {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.info-title {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.45;
+  /* 中文没有空格，长标题不加这个会直接冲出容器 */
+  overflow-wrap: anywhere;
+}
+
+.info-list {
+  display: grid;
+  /* minmax(0, 1fr) 而不是 1fr：否则长内容会把栅格撑宽，把整栏顶破 */
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 10px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.info-list dt {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.info-list dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.btn {
+  background: var(--accent);
+  color: #06121f;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 18px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn:hover {
+  filter: brightness(1.1);
+}
+
+.btn.ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  font-weight: 400;
+}
+
+.btn.ghost:hover {
+  border-color: var(--accent);
+  filter: none;
+}
+
+/*
+ * 开关式按钮。打开状态靠 aria-pressed 表达 ——
+ * 这样无障碍语义和视觉高亮是同一个来源，不会出现"看着是开的其实是关的"。
+ */
+.btn.ghost.toggle[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: #17202e;
+}
+
+.slider {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 260px;
+  min-width: 220px;
+}
+
+.slider-label {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.slider-label b {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.slider-label em {
+  color: var(--muted);
+  font-style: normal;
+  font-size: 12px;
+}
+
+.slider input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+/* ---------- 调试 HUD ---------- */
+
+.hud {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px 16px;
+  margin: 18px 0 0;
+  padding: 14px 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.hud dt {
+  color: var(--muted);
+}
+
+.hud dd {
+  margin: 0;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}

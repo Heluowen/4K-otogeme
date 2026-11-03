@@ -1,0 +1,33 @@
+osu file format v14
+
+[General]
+AudioFilename: audio.mp3
+Mode: 3
+
+[Metadata]
+Title:Smoke Test
+Artist:Tester
+Creator:rhythm-4k
+Version:4K Test
+
+[Difficulty]
+CircleSize:4
+OverallDifficulty:8
+
+[Events]
+//Background and Video events
+0,0,"bg, night.jpg",0,0
+1,0,"video.avi",0,0
+//Break Periods
+2,5000,8000
+
+[TimingPoints]
+0,500,4,2,0,100,1,0
+1200,-50,4,2,0,100,0,0
+2400,-200,4,2,0,100,0,0
+
+[HitObjects]
+64,192,1000,1,0,0:0:0:0:
+192,192,1250,1,0,0:0:0:0:
+320,192,1500,128,0,2000:0:0:0:0:
+448,192,1750,1,0,0:0:0:0:

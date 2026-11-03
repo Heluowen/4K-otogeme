@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>rhythm-4k · osu!mania 下落式音游</title>
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div>
+          <h1>rhythm-4k</h1>
+          <p class="subtitle">读取 osu!mania 谱面并跟随音乐下落 · 四键下落式</p>
+        </div>
+        <button id="settings-btn" class="btn ghost" type="button">设置</button>
+      </header>
+
+      <!-- ① 导入区：拖入 .osz 或 .zip -->
+      <section id="import-panel">
+        <div id="dropzone" class="dropzone" role="button" tabindex="0">
+          <p class="dz-title">把 <code>.osz</code> 或 <code>.zip</code> 拖到这里</p>
+          <p class="dz-hint">也可以点击选择文件 · 需要一个 osu!mania（Mode 3）谱面</p>
+        </div>
+        <!--
+          文件选择框刻意放在拖放区**外面**。
+          因为 HTMLElement.click() 派发的事件会冒泡，如果它放在拖放区内部，
+          程序化调用 fileInput.click() 会冒泡回拖放区的 click 监听器，
+          再次触发 fileInput.click() —— 轻则重复弹窗，重则无限递归。
+        -->
+        <input id="file-input" type="file" accept=".osz,.zip" hidden />
+        <p id="import-status" class="status"></p>
+
+        <!--
+          ④ 存档文件夹。
+          导入的 .osz 会直接写进用户选定的文件夹（File System Access API），
+          不再塞进 IndexedDB。浏览器不支持时这一块会自动退回浏览器存储。
+        -->
+        <section id="save-panel" hidden>
+          <div class="panel-head">
+            <h3 id="save-title">存档文件夹</h3>
+            <div class="panel-actions">
+              <button id="folder-grant" class="btn ghost" type="button" hidden>重新授权</button>
+              <button id="folder-pick" class="btn ghost" type="button">选择文件夹</button>
+              <button id="save-clear" class="btn ghost" type="button" hidden>清空浏览器存储</button>
+            </div>
+          </div>
+          <p id="save-status" class="field-note"></p>
+          <ul id="save-list" class="recent-list"></ul>
+        </section>
+      </section>
+
+      <!-- ② 难度选择：一个 .osz 里通常有多个难度 -->
+      <section id="pick-panel" hidden>
+        <div class="panel-head">
+          <h2>选择难度</h2>
+          <button id="pick-back" class="btn ghost" type="button">重新导入</button>
+        </div>
+        <p id="pick-info" class="status"></p>
+        <ul id="difficulty-list" class="diff-list"></ul>
+      </section>
+
+      <!-- ③ 播放区 -->
+      <section id="play-panel" hidden>
+        <!--
+          游玩区和信息栏并排。信息栏放左还是放右由 data-side 控制
+          （CSS 用 flex-direction: row-reverse 翻转，不需要在 JS 里挪 DOM）。
+        -->
+        <div id="play-layout" class="play-layout" data-side="right">
+          <div class="stage">
+            <canvas id="stage-canvas"></canvas>
+          </div>
+
+          <aside id="info-panel" class="info-panel">
+            <div class="info-cover">
+              <img id="info-cover-img" alt="歌曲曲绘" hidden />
+              <span id="info-cover-empty" class="info-empty">暂无消息</span>
+            </div>
+
+            <h3 id="info-title" class="info-title">暂无消息</h3>
+
+            <dl class="info-list">
+              <dt>曲师</dt>
+              <dd id="info-artist">暂无消息</dd>
+              <dt>谱师</dt>
+              <dd id="info-creator">暂无消息</dd>
+              <dt>难度</dt>
+              <dd id="info-version">暂无消息</dd>
+              <dt>BPM</dt>
+              <dd id="info-bpm">暂无消息</dd>
+              <dt>音符数</dt>
+              <dd id="info-notes">暂无消息</dd>
+            </dl>
+          </aside>
+        </div>
+
+        <div class="controls">
+          <button id="play-btn" class="btn" type="button">暂停</button>
+          <button id="restart-btn" class="btn ghost" type="button">重来</button>
+          <button id="play-back" class="btn ghost" type="button">换谱面</button>
+
+          <!-- 下落样式切换。aria-pressed 既是无障碍状态，也顺便给 CSS 当高亮开关 -->
+          <button id="tilt-btn" class="btn ghost toggle" type="button" aria-pressed="false">
+            倾斜轨道
+          </button>
+          <button id="shape-btn" class="btn ghost toggle" type="button" aria-pressed="false">
+            圆形音符
+          </button>
+
+          <p class="key-hint">
+            当前键位：<span id="key-hint">D F J K</span>
+            <em>（可在设置里修改）</em>
+          </p>
+        </div>
+
+        <dl id="hud" class="hud"></dl>
+      </section>
+    </div>
+
+    <!-- 设置面板 -->
+    <div id="settings-overlay" class="overlay" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <div class="modal-head">
+          <h2 id="settings-title">设置</h2>
+          <button id="settings-close" class="btn ghost" type="button">关闭</button>
+        </div>
+
+        <!-- 按键映射 -->
+        <section class="field-group is-wide">
+          <h3>按键映射</h3>
+          <p class="field-hint">
+            点击某一轨的按钮，然后在键盘上按下你想用的键。按 <code>Esc</code> 取消。
+          </p>
+          <div id="keymap" class="keymap"></div>
+          <p id="keymap-status" class="status"></p>
+          <div class="field-actions">
+            <button id="keymap-reset" class="btn ghost" type="button">恢复默认键位</button>
+          </div>
+          <p class="field-note">
+            绑定记录的是<b>物理按键位置</b>（<code>KeyboardEvent.code</code>），
+            所以切换输入法、打开大写锁定、换键盘布局都不会失效。
+            按到已被占用的键时，会自动把两条轨道对调。
+          </p>
+        </section>
+
+        <!-- 下落时间 -->
+        <section class="field-group">
+          <h3>下落时间</h3>
+          <p class="field-hint">
+            音符从画面顶部落到判定线所需的时间。数值越大落得越慢、看得越清楚。
+          </p>
+          <label class="slider">
+            <span class="slider-label"><b id="falltime-value">700</b> ms</span>
+            <input id="falltime" type="range" min="200" max="1500" step="10" value="700" />
+          </label>
+        </section>
+
+        <!-- 音频偏移 -->
+        <section class="field-group">
+          <h3>音频偏移</h3>
+          <p class="field-hint">
+            音符整体偏早或偏晚时用它微调。打完一局后，可以在结算页用本局的「平均偏差」一键修正。
+          </p>
+          <label class="slider">
+            <span class="slider-label"><b id="offset-value">0</b> ms</span>
+            <input id="audio-offset" type="range" min="-300" max="300" step="1" value="0" />
+          </label>
+        </section>
+
+        <!-- 倒计时 -->
+        <section class="field-group">
+          <h3>倒计时</h3>
+          <p class="field-hint">
+            谱面开始前、以及<b>暂停后恢复</b>时，都先空出这么久再开始，
+            让你有时间把手指放到键位上。设为 0 秒表示不要倒计时。
+          </p>
+          <label class="slider">
+            <span class="slider-label"><b id="countdown-value">3</b> 秒</span>
+            <input id="countdown" type="range" min="0" max="10" step="0.5" value="3" />
+          </label>
+          <p class="field-note">
+            恢复时的倒计时会先把画面<b>倒带</b>这么久 —— 你能重新看到接下来要打的音符，
+            而不是盯着一个定格画面。音频本身不会倒带，它只是在倒计时结束后从原位置继续。
+          </p>
+        </section>
+
+        <!-- 按键音 -->
+        <section class="field-group">
+          <h3>按键音</h3>
+          <label class="checkbox">
+            <input id="key-sound" type="checkbox" checked />
+            <span>按下轨道键时播放打击音</span>
+          </label>
+          <label class="slider">
+            <span class="slider-label">音量 <b id="key-sound-volume-value">70</b>%</span>
+            <input id="key-sound-volume" type="range" min="0" max="100" step="1" value="70" />
+          </label>
+          <p class="field-note">
+            按键音绑的是<b>按键</b>而不是判定 —— 空敲同样会有声音，因为那是键盘反馈。
+            改动开关或音量时会自动试听一次。
+          </p>
+        </section>
+
+        <!-- 信息栏位置 -->
+        <section class="field-group">
+          <h3>信息栏</h3>
+          <p class="field-hint">
+            在游玩区旁边显示曲绘、曲名、曲师、谱师、BPM 和音符数。
+            谱面里没有的信息会显示「暂无消息」。
+          </p>
+          <label class="field-row">
+            <span>显示位置</span>
+            <select id="info-side">
+              <option value="right">右侧</option>
+              <option value="left">左侧</option>
+              <option value="off">关闭</option>
+            </select>
+          </label>
+          <p class="field-note">
+            开启时游玩区容器会额外加宽，避免信息栏把轨道挤窄。
+          </p>
+        </section>
+
+        <!-- 下落样式 -->
+        <section class="field-group">
+          <h3>下落样式</h3>
+          <p class="field-hint">
+            斜的是<b>深度方向</b>：轨道像一条向远处延伸的路，越远越窄、音符越小。
+            角度越大透视越强。括号里是轨道最远处缩到判定线宽度的百分之多少。
+          </p>
+          <label class="slider">
+            <span class="slider-label">
+              倾斜角度 <b id="tilt-value">0</b>° <em id="tilt-effective"></em>
+            </span>
+            <input id="tilt" type="range" min="0" max="80" step="1" value="0" />
+          </label>
+
+          <label class="field-row">
+            <span>音符大小</span>
+            <select id="note-size">
+              <option value="1">1 · 最小</option>
+              <option value="2">2 · 较小</option>
+              <option value="3">3 · 标准（默认）</option>
+              <option value="4">4 · 较大</option>
+              <option value="5">5 · 最大</option>
+            </select>
+          </label>
+
+          <p class="field-note">
+            加速感是<b>透视本身带来的</b>，不是另加的一条曲线：音符沿轨道始终匀速，
+            但远处在屏幕上被压得很小、近处被放得很大，看起来就是越落越快 ——
+            和真实世界里"车从远处开过来"是同一个道理。
+            轨道只会向内收窄，永远不会斜出画面。
+          </p>
+        </section>
+
+        <!-- 谱面变速 -->
+        <section class="field-group">
+          <h3>谱面变速（SV）</h3>
+          <label class="checkbox">
+            <input id="ignore-sv" type="checkbox" />
+            <span>忽略谱面自带的 SV，使用恒定下落速度</span>
+          </label>
+          <p class="field-note">
+            SV 只改变画面滚动速度，<b>不影响判定时刻</b>。
+            关掉它可以让所有音符以完全均匀的速度下落。
+          </p>
+        </section>
+      </div>
+    </div>
+
+    <!-- 结算面板 -->
+    <div id="result-overlay" class="overlay" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="result-title">
+        <div class="modal-head">
+          <h2 id="result-title">结算</h2>
+          <span id="result-rank" class="rank">D</span>
+        </div>
+
+        <p id="result-fullcombo" class="result-fullcombo" hidden>FULL COMBO!!!</p>
+
+        <div class="result-grid">
+          <div class="result-cell">
+            <span class="result-label">分数</span>
+            <b id="result-score">0</b>
+          </div>
+          <div class="result-cell">
+            <span class="result-label">准确率</span>
+            <b id="result-accuracy">0.00%</b>
+          </div>
+          <div class="result-cell">
+            <span class="result-label">最大连击</span>
+            <b id="result-maxcombo">0</b>
+          </div>
+        </div>
+
+        <ul id="result-counts" class="result-counts"></ul>
+        <p id="result-offset" class="status"></p>
+
+        <div class="modal-actions">
+          <button id="result-retry" class="btn" type="button">重来</button>
+          <button id="result-fix-offset" class="btn ghost" type="button">
+            用平均偏差修正音频偏移
+          </button>
+          <button id="result-back" class="btn ghost" type="button">换谱面</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

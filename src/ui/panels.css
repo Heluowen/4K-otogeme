@@ -1,0 +1,435 @@
+/*
+ * 设置面板与结算面板的样式。
+ *
+ * 单独一个文件（而不是塞进 style.css），是因为这两块是叠加层，
+ * 和主流程（导入 → 选难度 → 播放）的布局完全无关，分开更好维护。
+ */
+
+/* ---------- 顶部栏 ---------- */
+
+.topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/* ---------- 叠加层通用 ---------- */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  /*
+   * ⚠️ 这里**不能**用 align-items: center 做居中。
+   *
+   * 一个 flex 子项比容器高的时候，center 会让它从**上下两端同时溢出**，
+   * 而滚动容器的「可滚动溢出区域」只包含 block-end（下方）那一边 ——
+   * 上方溢出的部分**永远滚不到**。表现出来就是"设置项一多，顶部就看不见了"。
+   *
+   * 所以改成 flex-start，居中交给 .modal 自己的 margin: auto 去做：
+   * 有富余空间时 auto 外边距会吸收掉、正常居中；空间不够时 auto 解析成 0，
+   * 面板从顶部开始排，整页都能滚到。
+   */
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 16px;
+  background: rgba(4, 4, 8, 0.72);
+  /* 面板本身可以很高，允许滚动 */
+  overflow-y: auto;
+}
+
+/* 模态框的内边距抽成变量：设置面板的吸顶标题要靠它做负外边距 */
+.modal {
+  --modal-pad-x: 24px;
+  --modal-pad-y: 22px;
+
+  width: 100%;
+  max-width: 620px;
+  /* 配合 .overlay 的 align-items: flex-start 完成"有空间就居中、没空间就顶头" */
+  margin: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: var(--modal-pad-y) var(--modal-pad-x) 26px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.modal-head h2 {
+  margin: 0;
+  font-size: 19px;
+}
+
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+/* ---------- 设置项 ---------- */
+
+/*
+ * 设置项多起来之后，单列会比窗口还高 —— 光是滚到底再滚回来找某一项就很烦。
+ * 宽屏下排成两列，高度直接省掉将近一半。窄屏（< 760px）保持单列。
+ */
+@media (min-width: 760px) {
+  #settings-overlay .modal {
+    max-width: 900px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 32px;
+    align-content: start;
+    align-items: start;
+  }
+
+  /* 标题和按键映射区要占满整行 —— 映射区是一排轨道按钮，挤在半列里会换行 */
+  #settings-overlay .modal-head,
+  #settings-overlay .field-group.is-wide {
+    grid-column: 1 / -1;
+  }
+
+  /*
+   * 两列下不再用横向分隔线：每条设置各画一段短线、两列之间还断开，看着很碎。
+   * 改成纯靠间距分隔。
+   */
+  #settings-overlay .field-group {
+    border-top: none;
+    padding-top: 14px;
+    padding-bottom: 14px;
+  }
+}
+
+.field-group {
+  padding: 18px 0;
+  border-top: 1px solid var(--border);
+}
+
+.field-group:first-of-type {
+  border-top: none;
+}
+
+.field-group h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+
+.field-hint {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.field-note {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.field-note b {
+  color: #b9b9cf;
+}
+
+.field-actions {
+  margin-top: 12px;
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.checkbox input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* 复选框下面紧跟滑条时要留点间距（单选项和滑条挤在一起很难看） */
+.checkbox + .slider {
+  margin-top: 14px;
+}
+
+/* 一行「标签 + 控件」的设置项（下拉框之类） */
+.field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.field-row select {
+  flex: none;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.field-row select:hover {
+  border-color: var(--accent);
+}
+
+/* ---------- 按键映射 ---------- */
+
+.keymap {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.keymap-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.keymap-lane {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.keymap-key {
+  width: 100%;
+  padding: 9px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #0f0f16;
+  color: var(--text);
+  font: 600 15px/1.2 ui-monospace, Consolas, monospace;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.keymap-key:hover {
+  border-color: var(--accent);
+}
+
+/* 「等待按键」状态：用脉冲边框提示用户此刻在捕获键盘 */
+.keymap-key.is-capturing {
+  border-color: var(--accent);
+  background: #17202e;
+  color: var(--accent);
+  animation: keymap-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes keymap-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(77, 163, 255, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(77, 163, 255, 0);
+  }
+}
+
+/* ---------- 结算 ---------- */
+
+.rank {
+  font: 700 34px/1 system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+}
+
+/* 结算页的全连击徽标。
+   元素从 hidden 变为显示时 CSS 动画会重新开始，所以每次全连击都能重新弹一次。 */
+.result-fullcombo {
+  margin: 16px 0 0;
+  text-align: center;
+  font: 800 22px/1 system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  color: #fff6d6;
+  text-shadow: 0 0 18px rgba(255, 210, 77, 0.9);
+  animation: fullcombo-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes fullcombo-pop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.result-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.result-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.result-cell b {
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.result-counts {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 0;
+}
+
+.result-counts li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 4px 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.result-counts .count-name {
+  font-weight: 600;
+}
+
+.result-counts .count-value {
+  color: var(--muted);
+}
+
+/* ---------- 播放区里的键位提示 ---------- */
+
+.key-hint {
+  margin: 0 0 0 auto;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.key-hint span {
+  color: var(--text);
+  font-family: ui-monospace, Consolas, monospace;
+  letter-spacing: 0.08em;
+}
+
+.key-hint em {
+  color: var(--muted);
+  font-style: normal;
+  font-size: 12px;
+}
+
+/* ---------- 最近导入（索引缓存） ---------- */
+
+#recent-panel {
+  margin-top: 24px;
+}
+
+#recent-panel h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.recent-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.recent-item {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.recent-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  text-align: left;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 14px;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.recent-open:hover {
+  border-color: var(--accent);
+  background: var(--panel-2);
+}
+
+.recent-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-meta {
+  flex: none;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 删除按钮：平时低调，悬停时才变红，避免误触 */
+.recent-remove {
+  flex: none;
+  width: 40px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.recent-remove:hover {
+  color: #ff5c7a;
+  border-color: #6b2733;
+}

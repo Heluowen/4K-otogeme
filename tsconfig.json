@@ -1,0 +1,28 @@
+{
+  /*
+   * TypeScript 配置。
+   * 我们只让 tsc 做「类型检查」，不产出 JS —— 真正把 TS 编译成 JS 的是 Vite(内部用 esbuild)，
+   * 所以这里必须写 noEmit: true，否则 tsc 会和 Vite 打架。
+   */
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+
+    /* 引入 Vite 的客户端类型声明，这样 import './style.css' 这种副作用导入才不会报错 */
+    "types": ["vite/client"],
+
+    /* 严格模式：宁可现在报错，也别在运行时踩 undefined */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src", "vite.config.ts"]
+}

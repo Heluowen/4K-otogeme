@@ -1,9 +1,10 @@
 # 依赖（npm install 会重新装出来，体积 56MB，绝不能进仓库）
 node_modules/
 
-# 构建产物（npm run build / build:portable 会重新生成）
+# 构建产物（npm run build / build:portable / build:server 会重新生成）
 dist/
 dist-portable/
+dist-server/
 
 # 测试临时产物（tools/make-fixture.ps1 中间会生成一份 .zip 再改名）
 tools/fixture.zip

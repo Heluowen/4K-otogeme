@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "build:portable": "tsc --noEmit && vite build && node tools/inline-dist.mjs",
+    "build:server": "tsc --noEmit && vite build && node tools/make-server-package.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "node tools/smoke-test.mjs"

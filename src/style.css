@@ -146,6 +146,38 @@ code {
   color: #ff7a7a;
 }
 
+/*
+ * 解析器指示徽标。
+ * 用 data-engine 区分两种状态：C 后端用青色（"已连上外部服务"），
+ * 内置解析器用灰色（"纯前端"）。颜色本身就是信息，不必读文字。
+ */
+.engine-badge {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.engine-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #7a7a8a;
+  flex: none;
+}
+
+.engine-badge[data-engine='c-backend'] {
+  color: #8fe3ff;
+}
+
+.engine-badge[data-engine='c-backend']::before {
+  background: #8fe3ff;
+  box-shadow: 0 0 6px rgba(143, 227, 255, 0.7);
+}
+
 /* ---------- 难度列表 ---------- */
 
 .panel-head {

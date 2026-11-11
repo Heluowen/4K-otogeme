@@ -6,6 +6,11 @@ dist/
 dist-portable/
 dist-server/
 
+# C 后端构建产物（build.bat / mingw32-make 会重新生成）
+c-backend/build/
+*.o
+*.exe
+
 # 测试临时产物（tools/make-fixture.ps1 中间会生成一份 .zip 再改名）
 tools/fixture.zip
 

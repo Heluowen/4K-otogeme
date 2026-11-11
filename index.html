@@ -29,6 +29,12 @@
         -->
         <input id="file-input" type="file" accept=".osz,.zip" hidden />
         <p id="import-status" class="status"></p>
+        <!--
+          解析器指示。项目有两条解析路径（C 后端 / 内置 TypeScript），
+          这里把「此刻实际用的是哪个」显示出来 —— 否则用户完全无从判断
+          C 后端到底有没有生效。探测完成前保持隐藏，避免闪烁。
+        -->
+        <p id="engine-badge" class="engine-badge" hidden></p>
 
         <!--
           ④ 存档文件夹。

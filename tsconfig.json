@@ -21,6 +21,15 @@
     "noImplicitOverride": true,
 
     "isolatedModules": true,
+    /*
+     * 允许 import 路径里显式写 .ts 扩展名。
+     *
+     * 本项目绝大多数导入是省略扩展名的（Vite 能解析），但 Node 的 ESM 加载器不行 ——
+     * 这让"纯逻辑模块能否被 Node 直接 import 做单测"变成了一个容易踩的坑。
+     * 对少数需要 Node 直接加载的模块（目前是 osu/backend.ts）显式写 .ts，
+     * 就能在没有打包器的前提下被 node 直接跑起来。只有 noEmit 下才能开启本项。
+     */
+    "allowImportingTsExtensions": true,
     "skipLibCheck": true,
     "noEmit": true
   },

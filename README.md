@@ -373,8 +373,9 @@ storyboard 用的图片，随手挑一张只会更糟。找不到就显示「暂
 | 音频 | Web Audio API | 唯一能做毫秒级调度的方案，`<audio>` 元素精度只有几百毫秒 |
 | 渲染 | Canvas 2D | 四键同屏通常 < 600 个音符，2D 足够；瓶颈在特效不在渲染器 |
 | 解压 | 自研 ZIP 读取器 | 浏览器已内置 `DecompressionStream`，省掉 fflate 依赖 |
+| 可选后端 | C11 + Winsock2 | 见下方「可选的 C 后端」。不存在时前端自动回落，功能不减 |
 
-`devDependencies` 里只有 vite、typescript，以及测试用的 fake-indexeddb。**运行时零依赖。**
+`devDependencies` 里只有 vite、typescript，以及测试用的 fake-indexeddb。**前端运行时零依赖。**
 
 冒烟测试不需要浏览器，直接跑 Node（Node 22.6+ 原生支持执行 TypeScript，只做类型擦除）。
 IndexedDB 那部分用 `fake-indexeddb` 顶上一个符合规范的实现，所以缓存代码是**真的被执行过**的，
@@ -402,7 +403,8 @@ src/
 │
 ├─ osu/                 osu!mania 适配层
 │  ├─ unzip.ts          ZIP 读取器（零依赖）
-│  ├─ parser.ts         .osu 文本解析
+│  ├─ parser.ts         .osu 文本解析（内置解析器）
+│  ├─ backend.ts        C 后端客户端：探测 / 调用 / 逐字段校验 / 失败回落
 │  ├─ timing.ts         TimingPoints → BPM 分段 / SV 分段
 │  └─ loader.ts         .osz → Chart 的组装
 │
@@ -429,6 +431,64 @@ src/
 BPM、SV、CircleSize、小节这些概念全部在 `osu/` 里折算成「第几轨 + 第几毫秒」。
 要接 Malody / Quaver / BMS，只需再写一个解析器产出同样的 `Chart`，
 判定和渲染代码一行都不用改。
+
+---
+
+## 可选的 C 后端
+
+除了在浏览器里解析谱面，项目还附带一个用 **C11 + Winsock2** 写的 HTTP 服务，
+可以接管 `.osu` 的解析工作。
+
+```
+c-backend/                19 个文件，2851 行（含 467 行测试）
+├─ build.bat              一键构建（不需要 make）
+├─ Makefile
+├─ include/               common / buf / str / json / osu / http / static / server
+├─ src/
+│  ├─ osu_parser.c   ★   .osu 解析器（537 行）
+│  ├─ http.c             HTTP 请求解析与响应构造
+│  ├─ static.c           静态文件服务 + 路径穿越防护
+│  ├─ server.c           select 事件循环 + 路由
+│  └─ ...
+└─ tests/test_osu.c      77 条断言
+```
+
+**它是可选的。** 前端启动时探测一次 `GET /api/health`：
+
+- 探测成功 → `.osu` 文本 `POST /api/parse` 给 C 解析（界面上会显示"C 后端"徽标）
+- 探测失败 → **静默回落到内置 TypeScript 解析器**，功能完全不受影响
+
+所以单文件 HTML 双击打开时照样能玩 —— 只是用内置解析器而已。
+
+**边界**：解压留在前端（浏览器自带 `DecompressionStream`），C 只接收纯文本。
+这样 C 侧不必实现 DEFLATE，API 也简化成「一段文本进、一段 JSON 出」。
+
+### 怎么用
+
+```bash
+npm run cbuild     # 构建（或直接双击 c-backend/build.bat）
+npm run ctest      # C 单元测试
+npm run ccheck     # 全部验证：单元测试 + 对拍 + 端到端
+npm run cserve     # 起服务，托管 dist/
+```
+
+### 怎么证明它是对的
+
+**对拍**：同一份 `.osu` 分别喂给 C 和 TypeScript 两个解析器，输出规范化 JSON 后**逐字节比较**。
+
+实测 11 个真实谱面（最大 5262 音符 / 28 万字符 JSON）**零差异**。
+
+```
+✓ chart.osu                                          (4 个音符, 610 字符)
+✓ ... (Gsuncraft) [One More Time!].osu               (5262 个音符, 288766 字符)
+✓ ... (nai_) [Expert  ji zhang shen qing qi fei].osu (1896 个音符, 102840 字符)
+... 共 11 个，全部逐字节一致
+```
+
+为了让对拍成立，C 端甚至复刻了 JavaScript 的几个怪癖（比如 `Number('') === 0`
+导致空值的 `OverallDifficulty:` 得到 0 而不是默认值）。
+
+详细文档见 **`c-backend/README.md`**（构建、API、内存约定、并发模型、C 语言要点、移植说明）。
 
 ---
 

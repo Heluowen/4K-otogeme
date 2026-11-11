@@ -24,6 +24,12 @@ import {
 } from '../osu/loader'
 import { bpmAt, type BpmSegment } from '../osu/timing'
 import {
+  ensureProbe,
+  getActiveEngine,
+  getBackendLabel,
+  isProbeSettled,
+} from '../osu/backend'
+import {
   clearCachedSets,
   deleteCachedSet,
   estimateUsage,
@@ -85,6 +91,7 @@ const importPanel = must('import-panel')
 const dropzone = must<HTMLDivElement>('dropzone')
 const fileInput = must<HTMLInputElement>('file-input')
 const importStatus = must<HTMLParagraphElement>('import-status')
+const engineBadge = must<HTMLParagraphElement>('engine-badge')
 const savePanel = must('save-panel')
 const saveTitle = must<HTMLElement>('save-title')
 const saveStatus = must<HTMLParagraphElement>('save-status')
@@ -227,6 +234,10 @@ export function startApp(): void {
   // 恢复上次选过的存档文件夹。这一步只恢复句柄、不申请权限 ——
   // 申请权限需要用户手势，会在界面上提示用户点「重新授权」。
   void restoreSaveFolder().then(() => refreshSavedList())
+
+  // 尽早探测 C 后端：让这次网络往返和"用户去拖文件"并行发生，
+  // 而不是等到导入那一刻再额外等一次（本地回环也要几毫秒，离线时是超时）。
+  void ensureProbe().then(() => renderEngineBadge())
 
   // 曲绘解码失败（文件损坏、格式不支持）时退回占位文案，而不是留一个破图
   infoCoverImg.addEventListener('error', () => {
@@ -627,6 +638,36 @@ function renderDifficultyList(set: OsuSet): void {
     button.append(name, meta, keys)
     item.append(button)
     difficultyList.append(item)
+  }
+
+  // 谱面刚解析完，正是刷新"用的哪个解析器"的时机
+  renderEngineBadge()
+}
+
+/**
+ * 刷新解析器指示。
+ *
+ * 项目有两条解析路径：C 后端（`POST /api/parse`）和内置 TypeScript 解析器。
+ * `parseOsuSmart` 会自动挑一条，但这个选择对用户是完全不可见的 ——
+ * 所以这里把它显式显示出来，否则「C 后端到底有没有生效」根本无从判断。
+ *
+ * 探测未完成时保持隐藏，避免刚打开页面就闪一下"未检测到后端"。
+ */
+function renderEngineBadge(): void {
+  if (!isProbeSettled()) {
+    engineBadge.hidden = true
+    return
+  }
+
+  engineBadge.hidden = false
+
+  if (getActiveEngine() === 'c-backend') {
+    const label = getBackendLabel()
+    engineBadge.textContent = label === '' ? '谱面解析：C 后端' : `谱面解析：C 后端 · ${label}`
+    engineBadge.dataset.engine = 'c-backend'
+  } else {
+    engineBadge.textContent = '谱面解析：内置 TypeScript（未检测到 C 后端）'
+    engineBadge.dataset.engine = 'builtin'
   }
 }
 

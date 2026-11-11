@@ -11,7 +11,12 @@
     "build:server": "tsc --noEmit && vite build && node tools/make-server-package.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "node tools/smoke-test.mjs"
+    "test": "node tools/smoke-test.mjs",
+
+    "cbuild": "cd c-backend && mingw32-make",
+    "ctest": "cd c-backend && mingw32-make test",
+    "ccheck": "node tools/c-backend-check.mjs",
+    "cserve": "c-backend/build/rhythm4k-server.exe --root dist --port 8080"
   },
   "devDependencies": {
     "fake-indexeddb": "^6.2.5",

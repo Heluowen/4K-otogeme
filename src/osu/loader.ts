@@ -1,6 +1,7 @@
 import type { Chart, Note } from '../core/types'
 import { isAudioFileName } from '../audio/decode'
-import { parseOsu, type OsuBeatmap } from './parser'
+import { parseOsuSmart } from './backend'
+import type { OsuBeatmap } from './parser'
 import { deriveBpmSegments, deriveSvSegments, type BpmSegment, type SvSegment } from './timing'
 import { readZip, type ZipFiles } from './unzip'
 
@@ -8,10 +9,14 @@ import { readZip, type ZipFiles } from './unzip'
  * 组装层：把一个 `.osz` / `.zip` 文件字节，变成可以直接播放的谱面。
  *
  * 数据流：
- *   File → ArrayBuffer → readZip → 逐个 parseOsu → 过滤 Mode 3 → OsuSet
+ *   File → ArrayBuffer → readZip → 逐个 parseOsuSmart → 过滤 Mode 3 → OsuSet
  *                                                              ↓ 用户选一个难度
  *                              pickAudioBytes + decodeAudio → AudioBuffer
  *                              toChart                       → Chart
+ *
+ * 注意 `parseOsuSmart` 而不是 `parseOsu`：它会先探测 C 后端，
+ * 能用就把 `.osu` 文本发给 C 解析，不能用就静默回落到内置解析器。
+ * 对上层来说两者返回的是同一个类型，调用方不需要关心用的是哪个。
  */
 
 /** 一个可玩的难度。 */
@@ -59,7 +64,8 @@ export async function readOsuSet(sourceName: string, buffer: ArrayBuffer): Promi
 
     let beatmap: OsuBeatmap
     try {
-      beatmap = parseOsu(decoder.decode(data))
+      // 优先 C 后端；不可用/出错时内部自动回落到内置解析器，不会抛网络异常
+      beatmap = await parseOsuSmart(decoder.decode(data))
     } catch {
       // 单个 .osu 坏了不应该让整个谱面包读不出来，跳过就好
       continue
